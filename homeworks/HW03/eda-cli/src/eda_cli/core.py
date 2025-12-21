@@ -170,7 +170,7 @@ def top_categories(
     return result
 
 
-def compute_quality_flags(summary: DatasetSummary, missing_df: pd.DataFrame) -> Dict[str, Any]:
+def compute_quality_flags(summary: DatasetSummary, missing_df: pd.DataFrame, df: pd.DataFrame = None) -> Dict[str, Any]:
     """
     Простейшие эвристики «качества» данных:
     - слишком много пропусков;
@@ -185,6 +185,34 @@ def compute_quality_flags(summary: DatasetSummary, missing_df: pd.DataFrame) -> 
     flags["max_missing_share"] = max_missing_share
     flags["too_many_missing"] = max_missing_share > 0.5
 
+    # 1. has_constant_columns - есть ли колонки, где все значения одинаковые
+    if df is not None:
+        constant_cols = []
+        for col in df.columns:
+            if df[col].nunique(dropna=True) == 1:
+                constant_cols.append(col)
+        
+        flags["has_constant_columns"] = len(constant_cols) > 0
+        flags["constant_columns_count"] = len(constant_cols)
+    else:
+        flags["has_constant_columns"] = False
+        flags["constant_columns_count"] = 0
+
+
+    # 2. has_high_cardinality_categoricals - категориальные признаки с большим числом уникальных значений
+    if df is not None:
+        high_cardinality_cols = []
+        for col in df.select_dtypes(include=['object', 'category']).columns:
+            unique_count = df[col].nunique(dropna=True)
+            if unique_count > summary.n_rows * 0.5:
+                high_cardinality_cols.append((col, unique_count))
+        
+        flags["has_high_cardinality_categoricals"] = len(high_cardinality_cols) > 0
+        flags["high_cardinality_count"] = len(high_cardinality_cols)
+    else:
+        flags["has_high_cardinality_categoricals"] = False
+        flags["high_cardinality_count"] = 0
+
     # Простейший «скор» качества
     score = 1.0
     score -= max_missing_share  # чем больше пропусков, тем хуже
@@ -192,6 +220,16 @@ def compute_quality_flags(summary: DatasetSummary, missing_df: pd.DataFrame) -> 
         score -= 0.2
     if summary.n_cols > 100:
         score -= 0.1
+
+    #штраф за дубликаты
+    if flags["has_constant_columns"]:
+        score -= 0.2
+
+    #штраф за категориальные признаки
+    if flags["has_high_cardinality_categoricals"]:
+        score -= 0.3
+
+
 
     score = max(0.0, min(1.0, score))
     flags["quality_score"] = score
