@@ -66,6 +66,27 @@ uv run eda-cli report data/example.csv --out-dir reports
 - `missing_matrix.png` – визуализация пропусков;
 - `correlation_heatmap.png` – тепловая карта корреляций.
 
+## Веб-API
+Приложение также предоставляет REST API на FastAPI:
+
+## Запуск сервера
+```bash
+uvicorn eda_cli.api:app --reload
+```
+Сервер будет доступен по адресу: http://127.0.0.1:8000
+
+## Эндпоинты
+ - GET /health - Простейший health-check сервиса
+
+ - POST /quality - Эндпоинт-заглушка, который принимает агрегированные признаки датасета
+    и возвращает эвристическую оценку качества.
+
+ - POST /quality_from_csv - Эндпоинт, который принимает CSV-файл, запускает EDA-ядро
+    (summarize_dataset + missing_table + compute_quality_flags)
+    и возвращает оценку качества данных
+
+- POST /quality-flags-from-csv - Возвращает полный набор флагов качества по CSV-файлу
+
 ## Тесты
 
 ```bash
